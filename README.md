@@ -35,7 +35,7 @@ You need to create a Project on the [Google Developers](https://console.develope
 3) Create OAuth Client ID, for Application-Type: *Other*.
 
 You will need to **download the OAuth Credentials** JSON file to the same directory as YoutubeSync and save it as *client_secrets.json*. 
-You should also edit YoutubeSync.py and set the API Key at the `G__gleAPIKey` variable. 
+You should also edit YoutubeSync&#46;py and set the API Key at the `G__gleAPIKey` variable. 
 
 ## Notes & Warnings
 - Please note that if you have a Playlist on Youtube with the **same** name on your Music Library, **IT WILL BE OVERWRITTEN**. 
@@ -47,6 +47,9 @@ You should also edit YoutubeSync.py and set the API Key at the `G__gleAPIKey` va
 
 ## TODO
 - Option to set the type of a synced Youtube Playlist: Not only *Private*, but also *Unlisted* or *Public*. 
+
+## HOWTO
+You can find a simple tutorial on how to set up YoutubeSync with `cron` to have automated syncs [here...](http://inatago.com/betalog/youtube_sync.html)
 
 ## License
     Copyright 2016 Antonios Katzourakis
@@ -62,3 +65,4 @@ You should also edit YoutubeSync.py and set the API Key at the `G__gleAPIKey` va
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
+
