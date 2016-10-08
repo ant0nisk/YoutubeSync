@@ -17,28 +17,49 @@ from __future__ import unicode_literals
 	-------------
 """
 
-import requests
-import isodate
-import pyItunes
-from apiclient.discovery import build
-from apiclient.errors import HttpError
-from oauth2client.client import flow_from_clientsecrets
-from oauth2client.file import Storage
-from oauth2client.tools import argparser, run_flow
+try:
+	import requests
+	import isodate
+	from apiclient.discovery import build
+	from apiclient.errors import HttpError
+	from oauth2client.client import flow_from_clientsecrets
+	from oauth2client.file import Storage
+	from oauth2client.tools import argparser, run_flow
+except:
+	print("One or more dependencies were not installed. \nPlease run `python install_dependencies.py` (needs root priviliges)");
+	exit(0)
+
+import platform
+
+try:
+	import pyItunes
+except:
+	if platform.system() == "Darwin":
+		print("You need to install pyItunes first. \nPlease run `python install_dependencies.py` (needs root priviliges)");
+		exit(0)
+
+try:
+	import songdetails
+except:
+	if platform.system() == "Linux":
+		print("You need to install songdetails first. \nPlease run `python install_dependencies.py` (needs root priviliges)");
+		exit(0)
 
 import httplib2
 import time
 import os
 import shutil
 import getpass
-import platform
 import urllib
 import sys
 import json
+from lxml import etree
 
 G__gleAPIKey = '' 								# Your API Key for this Project from console.developers.google.com
 CLIENT_SECRETS_FILE = "client_secrets.json" 	# Where your client secrets file for this project is located. (From console.developers.google.com)
 _default_language = 'en'						# Default Language
+
+verbose = False	# Don't print a lot of stuff
 
 # = Do not edit the below =
 conf = {
@@ -71,8 +92,6 @@ flow = flow_from_clientsecrets(CLIENT_SECRETS_FILE,
 	scope=YOUTUBE_READ_WRITE_SCOPE)
 	
 storage = Storage("%s-oauth2.json" % sys.argv[0])
-if sys.argv[0] == '/opt/local/bin/ipython': # dbg
-	storage = Storage("ipythons-oauth2.json")
 credentials = storage.get()
 
 if credentials is None or credentials.invalid:
@@ -88,11 +107,17 @@ LibraryFile = ''
 usersPlaylistsCache = {}
 configSavePath = ''
 configLoadPath = ''
+system = platform.system()
 
-if platform.system() == "Darwin":
+if system == "Darwin":
 	Home = os.path.join("/",'Users',getpass.getuser())
 	LibraryFile = os.path.join(Home, 'Music', 'iTunes', 'iTunes Music Library.xml')
-	# dbg do for linux	
+elif system == "Linux":
+	Home = os.path.join("/",'home',getpass.getuser())
+	LibraryFile = os.path.join(Home, '.local', 'share', 'rhythmbox', 'playlists.xml')
+else:
+	print("Only Mac and Linux are supported for now...")
+	exit(0);
 
 # Python 2 and 3 Compatibility
 try:
@@ -119,6 +144,7 @@ def syncYoutubeAccount():
 	notFound = []
 	
 	for p in playlistNames:
+		if verbose: print("Synchronising: {}".format(p))
 		playlistTracks = getPlaylistTracks(lbr, p)
 		youtubeResults = getVideosForPlaylist(playlistTracks)
 		if youtubeResults != -1:
@@ -165,9 +191,13 @@ def loadConfig():
 
 def newConfig():
 	# Create new Configuration File
-	global conf
+	global conf, configSavePath
 	lbr = getLibrary()
 	playlists = getPlaylists(lbr)
+	if len(playlists) == 0:
+		print("No Playlists found! Please add a Playlist to your Music Library and try again.")
+		exit(0)
+	
 	for i in range(len(playlists)):
 		print("[{}] {}".format(i+1, playlists[i]))
 	
@@ -197,18 +227,52 @@ def newConfig():
 			
 """ Local Library Functions """
 def getLibrary():
-	# Get the iTunes Library
-	shutil.copy(LibraryFile, os.path.join("/tmp","__itunes_library__.xml"))
-	lbry = pyItunes.Library(str(os.path.join("/tmp","__itunes_library__.xml")))
-	return lbry
-
+	# Get the Music Library
+	if system == "Darwin":
+		# Get the iTunes Library (in pyItunes Library Object format)
+		shutil.copy(LibraryFile, os.path.join("/tmp","__itunes_library__.xml"))
+		lbry = pyItunes.Library(str(os.path.join("/tmp","__itunes_library__.xml")))
+		return lbry
+	
+	# Get Rhythmbox Library (in XML format)
+	libraryXMLTree = None
+	try:
+		with open(LibraryFile, 'r') as f:
+			libraryXMLTree = etree.fromstring(f.read())	
+			return libraryXMLTree
+	except Exception,err:
+		print("Error while opening Library file: {}".format(err))
+		exit(0)
+	
 def getPlaylists(libraryInstance):
 	# Return the Playlist Names
-	return libraryInstance.getPlaylistNames()
+	if system == "Darwin":
+		return libraryInstance.getPlaylistNames()
+
+	rtObj = []
+	for element in libraryInstance.iter():
+		if element.tag == "playlist" and element.get('type') == 'static':
+			rtObj.append(element.get('name'))
+
+	return rtObj
 
 def getPlaylistTracks(libraryInstance, playlistName): 
 	# Get the songs included in the specified Playlist
-	return libraryInstance.getPlaylist(playlistName).tracks
+	if system == "Darwin":
+		return libraryInstance.getPlaylist(playlistName).tracks
+	
+	rtObj = []
+	for element in libraryInstance.iter('playlist'):
+		if element.get('name') == playlistName:
+			for s in element.iter('location'):
+				song = songdetails.scan(urllib.unquote(s.text[7:]))
+				if verbose: print("\t- Adding Song: {}".format(song.title))
+				if song != None:
+					rtObj.append(song)
+				else:
+					print("Warning: Couldn't get Metadata for Song at Path: {}".format(element.text))
+
+	return rtObj
 	
 """ Youtube Functions """
 def updateYTPlaylist(playlistName, videoObjects):
@@ -224,8 +288,6 @@ def insertSongsToYTPlaylist(playlistName, videoIDs):
 	if playlistName not in uPlaylists.keys():
 		try:
 			createYTPlaylist(playlistName)
-			while playlistName not in getUserPlaylists(True):
-				time.sleep(1)
 		except Exception,err:
 			print("insertSongsToYTPlaylist Error: {}".format(err))
 			return -1
@@ -251,11 +313,7 @@ def deleteYTPlaylist(playlistName):
 	uPlaylists = getUserPlaylists()
 	if playlistName in uPlaylists.keys():
 		youtube.playlists().delete(id=uPlaylists[playlistName]).execute()
-		i = 0
-		while playlistName in getUserPlaylists(True) and i < 10:
-			time.sleep(1)
-			i += 1
-			
+
 def createYTPlaylist(playlistNames):
 	# Create the playlists on Youtube
 	global usersPlaylistsCache
@@ -275,16 +333,17 @@ def createYTPlaylist(playlistNames):
 					privacyStatus="private"
 				)
 			)).execute()
-
-	getUserPlaylists(force=True)
+			
+		usersPlaylistsCache[p] = playlists_insert_response['id']		
 	
-def getUserPlaylists(force=False):
+def getUserPlaylists():
 	# Get the list of the user-generated playlists.
 	global usersPlaylistsCache
-	
-	if usersPlaylistsCache != {} and force == False:
-		return usersPlaylistsCache
+	if usersPlaylistsCache != {}:
+		return usersPlaylistsCache	
 		
+	if verbose: print("Fetching Youtube Playlists...")
+
 	try:
 		playlists = youtube.playlists().list(part='snippet', mine='true').execute()['items']
 		for p in playlists:
@@ -296,12 +355,14 @@ def getUserPlaylists(force=False):
 		return -1
 	
 def getVideosForPlaylist(songObjects):
-	# Search for specific songs on Youtube. songObjects are in the format of pyItunes, so that attributes such as the artist and the duration are fetched.
+	# Search for specific songs on Youtube. songObjects are in the format of pyItunes (or songdetails for Linux), so that attributes such as the artist and the duration are fetched.
 	videoObjects = []
 	notFound = []
 
 	for s in songObjects:
 		nc = True
+		if system == "Linux": s.name = s.title; s.length = s.duration.total_seconds()*1000
+		if verbose: print("\t\t- Finding Videos for Song: {}".format(s.name))
 		results = searchForVideos("{} - {}".format(s.name, s.artist))
 		if results == -1:
 			return -1
@@ -363,12 +424,17 @@ if __name__ == "__main__":
 	elif '--config' in sys.argv:
 		configLoadPath = sys.argv[sys.argv.index("--config")+1]
 	elif '--help' in sys.argv or 'help' in sys.argv or '?' in sys.argv:
-		print("""Usage: python {} <config_path>
+		print("""Usage: python {0} <config_path>
 
 Other Options:
 	--config configuration_path.conf : Load a Configuration File. If not used, the standard configuration location will be used.
 	
 	--new-config : Start a new Configuration Wizard
+	
+Example:
+	These are equivalent:
+		python {0} ytsync.conf
+		python {0} --config ytsync.conf
 		""".format(__file__))
 		exit(0)
 		
