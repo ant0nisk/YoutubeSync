@@ -257,7 +257,7 @@ def getLibrary():
 		with open(LibraryFile, 'r') as f:
 			libraryXMLTree = etree.fromstring(f.read())	
 			return libraryXMLTree
-	except Exception,err:
+	except (Exception) as err:
 		print("Error while opening Library file: {}".format(err))
 		exit(0)
 	
@@ -305,7 +305,7 @@ def insertSongsToYTPlaylist(playlistName, videoIDs):
 	if playlistName not in uPlaylists.keys():
 		try:
 			createYTPlaylist(playlistName)
-		except Exception,err:
+		except (Exception) as err:
 			print("insertSongsToYTPlaylist Error: {}".format(err))
 			return -1
 	
@@ -321,7 +321,7 @@ def insertSongsToYTPlaylist(playlistName, videoIDs):
 							"videoId": v_id
 						}
 					})).execute()
-		except Exception,err:
+		except (Exception) as err:
 			print("insertSongsToYTPlaylist Error: {}".format(err))
 			return -1
 	
@@ -367,7 +367,7 @@ def getUserPlaylists():
 			usersPlaylistsCache[p['snippet']['title']] = p['id']
 
 		return usersPlaylistsCache
-	except Exception,err:
+	except (Exception) as err:
 		print("getUserPlaylists Error: {}".format(err))
 		return -1
 	
@@ -401,7 +401,7 @@ def getVideoDurations(v_ids):
 	try:
 		r = requests.get(uri, headers={'Accept-Encoding': 'gzip'})
 		return r.json()['items']
-	except Exception,err:
+	except (Exception) as err:
 		print("getVideoDurations Error: {}".format(err))
 		return -1
 	
@@ -418,7 +418,7 @@ def searchForVideos(name, type='video', language=None):
 		r = requests.get(uri, headers={'Accept-Encoding': 'gzip'})
 		jsonData = r.json()
 		if 'items' not in jsonData.keys():		
-			print jsonData
+			print("Unexpected API Response: \n{}".format(jsonData))
 			
 		items = jsonData['items']
 		ids = [g['id']['videoId'] for g in items]
@@ -430,7 +430,7 @@ def searchForVideos(name, type='video', language=None):
 			items[i].update({'duration' : isodate.parse_duration(durations[i]['contentDetails']['duration']).total_seconds()})
 
 		return items
-	except Exception,err:
+	except (Exception) as err:
 		print("searchForVideos Error: {}".format(err))
 		return -1
   

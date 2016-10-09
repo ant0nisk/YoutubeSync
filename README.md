@@ -9,6 +9,7 @@ All the Youtube Playlists will be Private.
 - Use with *cron jobs* and have automatic syncs with your Youtube Playlists
 - Option to Auto-delete Youtube playlists if you remove them from your Library
 - Uses OAuth-2.0 for maximum security of the End-User
+- Compatibility: Python 2 and 3
 
 ## Usage
 To run YoutubeSync just run this on your Terminal:
