@@ -8,6 +8,7 @@ All the Youtube Playlists will be Private.
 - Easy to use and one-time setup
 - Use with *cron jobs* and have automatic syncs with your Youtube Playlists
 - Option to Auto-delete Youtube playlists if you remove them from your Library
+- Set the listing-type of each of your playlists: Private (default), Unlisted or Public
 - Uses OAuth-2.0 for maximum security of the End-User
 - Compatibility: Python 2 and 3
 
@@ -45,9 +46,6 @@ You should also edit YoutubeSync&#46;py and set the API Key at the `G__gleAPIKey
 - For insurance reasons, the sync process works one way. If you add/remove a song in your Youtube Playlist, it won't be added or removed on your local Playlist.
 - If you add a song on the Youtube playlist, it won't be downloaded to your computer. *This is to prevent piracy.*
 - YoutubeSync is under heavy testing. Please test it yourself before you make any automated syncs to your Youtube channel.
-
-## TODO
-- Option to set the type of a synced Youtube Playlist: Not only *Private*, but also *Unlisted* or *Public*. 
 
 ## HOWTO
 You can find a simple tutorial on how to set up YoutubeSync with `cron` to have automated syncs [here...](http://inatago.com/betalog/youtube_sync.html)

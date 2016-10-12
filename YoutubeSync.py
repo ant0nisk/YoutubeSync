@@ -72,7 +72,7 @@ import sys
 import json
 from lxml import etree
 
-G__gleAPIKey = '' 								# Your API Key for this Project from console.developers.google.com
+G__gleAPIKey = ''								# Your API Key for this Project from console.developers.google.com
 CLIENT_SECRETS_FILE = "client_secrets.json" 	# Where your client secrets file for this project is located. (From console.developers.google.com)
 _default_language = 'en'						# Default Language
 
@@ -81,6 +81,7 @@ verbose = False	# Don't print a lot of stuff
 # = Do not edit the below =
 conf = {
 	'synchable-playlists': [],
+	'playlist-listing-types' : [],
 	'delete-removed-playlists': False,
 	'previous-playlists': []
 }
@@ -215,15 +216,30 @@ def newConfig():
 		print("No Playlists found! Please add a Playlist to your Music Library and try again.")
 		exit(0)
 	
+	print("Playlists:")
 	for i in range(len(playlists)):
 		print("[{}] {}".format(i+1, playlists[i]))
 	
-	syncables_indx = input("Select which Playlists to Sync: \t(Comma-separated numbers as shown above)\n > ")
+	syncables_indx = input("\nSelect which Playlists to Sync: \t(Comma-separated numbers as shown above)\n > ")
 	syncables = [playlists[i] for i in range(len(playlists)) if str(i+1) in syncables_indx.replace(" ","").split(",")]
-	delete_old = input("Should the Playlists you remove from iTunes be deleted from Youtube? [Yes/No] \t(default: No)\n > ")
+	syncableTypes = []
+	print("\nEnter listing-types for your Youtube Playlists.\nOptions:\n[1] Private (default)\n[2] Unlisted\n[3] Public");
+	for i in syncables:
+			ds = '-1'
+			r = False
+			while ds not in ['1','2','3']:
+				if r: print("Invalid selection")
+				r = True
+				ds = input("\nEnter listing-type for {}: \n > ".format(i))
+				if not ds:
+					ds = '1'
+			
+			syncableTypes.append(ds)
+				
+	delete_old = input("\nShould the Playlists you remove from iTunes be deleted from Youtube? [Yes/No] \t(default: No)\n > ")
 	delete_old = delete_old.lower() == "yes"
 	
-	savePath = input("Where to save the Youtube Sync configuration file? \t(default: {})\n > ".format(os.path.join("~","Documents",".ytSync.conf")))
+	savePath = input("\nWhere to save the Youtube Sync configuration file? \t(default: {})\n > ".format(os.path.join("~","Documents",".ytSync.conf")))
 	if not savePath:
 		savePath = os.path.join(Home, "Documents", ".ytSync.conf")
 	
@@ -231,8 +247,9 @@ def newConfig():
 
 	conf = {
 		'synchable-playlists': syncables,
+		'playlist-listing-types': syncableTypes,
 		'delete-removed-playlists': delete_old,
-		'previous-playlists': conf['previous-playlists']
+		'previous-playlists': conf['previous-playlists'],
 	}
 	
 	savePath = os.path.abspath(savePath)
@@ -240,7 +257,7 @@ def newConfig():
 	with open(savePath, 'w') as f:
 		f.write(json.dumps(conf))
 	
-	print("Configuration File saved!")
+	print("\nConfiguration File saved!")
 			
 """ Local Library Functions """
 def getLibrary():
@@ -293,11 +310,14 @@ def getPlaylistTracks(libraryInstance, playlistName):
 	
 """ Youtube Functions """
 def updateYTPlaylist(playlistName, videoObjects):
-	# Update a Youtube playlist. If the Playlist doesn't exist, it will be created.
-	deleteYTPlaylist(playlistName)
-		
+	# Update a Youtube playlist. If the Playlist doesn't exist, it will be created.		
 	videoIDs = [v['id']['videoId'] for v in videoObjects]
+	
+	if emptyYTList(playlistName) == -1:
+		return -1
+		
 	notFound = insertSongsToYTPlaylist(playlistName, videoIDs)
+	return notFound
 	
 def insertSongsToYTPlaylist(playlistName, videoIDs):
 	# Add the specified video IDs to a Playlist. If the Playlist doesn't exist, it will be created.
@@ -331,15 +351,72 @@ def deleteYTPlaylist(playlistName):
 	if playlistName in uPlaylists.keys():
 		youtube.playlists().delete(id=uPlaylists[playlistName]).execute()
 
+def emptyYTList(playlistName):
+	# Empties a Youtube List
+	listIDs = getYTListItemIDs(playlistName)
+	if listIDs == -1:
+		return -1
+	
+	try:
+		for lid in listIDs:
+			youtube.playlistItems().delete(id=lid).execute()
+	except Exception(err):
+		print("deleteYTListItems Error: {}".format(err))
+		return -1
+		
+def getYTListItemIDs(playlistName):
+	# Get the ID of the Items in a Playlist.
+	try:
+		playlistId = getUserPlaylists()[playlistName]
+	except:
+		createYTPlaylist(playlistName)
+		playlistId = getUserPlaylists()[playlistName]
+
+	items = []
+	
+	itemsDone = False
+	pageToken = ''
+	results = 50
+	try:
+		while itemsDone != True:
+			resultsJSON = youtube.playlistItems().list(part='id', playlistId=playlistId, maxResults=50, pageToken=pageToken).execute()
+			itemsDone = 'nextPageToken' not in resultsJSON.keys()
+			items.extend([x['id'] for x in resultsJSON['items']][-results:])
+			if resultsJSON['pageInfo']['totalResults'] - 50 < 50:
+				results = resultsJSON['pageInfo']['totalResults'] - 50
+		
+			if not itemsDone:
+				pageToken = resultsJSON['nextPageToken']
+		
+		return items
+	except Exception(err):
+		print("getYTListItemIDs Error: {}".format(err))
+		return -1
+
 def createYTPlaylist(playlistNames):
 	# Create the playlists on Youtube
 	global usersPlaylistsCache
+	global conf
+	
 	uri = "https://www.googleapis.com/youtube/v3/playlists"
 
 	if type(playlistNames) in [str, unicode]:
 		playlistNames = [playlistNames]
 
+	lut = {
+		'1' : 'private',
+		'2' : 'unlisted',
+		'3' : 'private'
+	}
+	
 	for p in playlistNames:
+		playlistIndex = conf['synchable-playlists'].index(p)
+		l_type = 'private'
+		try:
+			l_type = lut[conf['playlist-listing-types'][playlistIndex]]
+		except:
+			l_type = 'private'	
+
 		playlists_insert_response = youtube.playlists().insert(
 			part="snippet, status",
 			body=dict(
@@ -347,7 +424,7 @@ def createYTPlaylist(playlistNames):
 					title=p
 				),
 				status=dict(
-					privacyStatus="private"
+					privacyStatus=l_type
 				)
 			)).execute()
 			
