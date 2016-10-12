@@ -536,8 +536,8 @@ Example:
         """.format(__file__))
         exit(0)
     else:
-    	if len(sys.argv) > 1:
-    		configLoadPath = sys.argv[1]
+        if len(sys.argv) > 1:
+            configLoadPath = sys.argv[1]
         
     loadConfig()
     syncYoutubeAccount()
