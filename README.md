@@ -48,7 +48,7 @@ You should also edit YoutubeSync&#46;py and set the API Key at the `G__gleAPIKey
 - YoutubeSync is under heavy testing. Please test it yourself before you make any automated syncs to your Youtube channel.
 
 ## HOWTO
-You can find a simple tutorial on how to set up YoutubeSync with `cron` to have automated syncs [here...](http://inatago.com/betalog/youtube_sync.html)
+You can find a simple tutorial on how to set up YoutubeSync with `cron` to have automated syncs [here...](https://antonis.cc/betalog/youtube_sync.html)
 
 ## License
     Copyright 2016 Antonios Katzourakis
